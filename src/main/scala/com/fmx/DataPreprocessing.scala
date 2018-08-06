@@ -18,10 +18,12 @@ package com.fmx
   * limitations under the License.
   */
 
+import java.io.File
+
 import com.alibaba.fastjson.JSON
+import org.apache.flink.api.scala._
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
-import org.apache.flink.api.scala._
 
 /**
   * Skeleton for a Flink Job.
@@ -41,34 +43,33 @@ import org.apache.flink.api.scala._
 
 import org.apache.flink.configuration.ConfigConstants
 
-object Job {
+object DataPreprocessing {
   def main(args: Array[String]) {
     // set up the execution environment
+    var inputFile = "/Users/fmx/workfiles/metrics_data/es2.data"
+    if (args.length == 1) {
+      inputFile = args(0)
+    }
+    var outputFile = inputFile + ".processed"
+    val tmpFile=new File(outputFile)
+    if (tmpFile.exists()) {
+      tmpFile.delete()
+    }
     val conf: Configuration = new Configuration()
     conf.setBoolean(ConfigConstants.LOCAL_START_WEBSERVER, true)
     val env = StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(conf)
 
     env.setParallelism(1)
 
-
-    val esdSource = env.readTextFile("/Users/fmx/workfiles/metrics_data/es1.data")
+    val esdSource = env.readTextFile(inputFile)
     val esdTrans = esdSource.filter(str => {
-      try {
-        val json = JSON.parseObject(str)
-        if (json.containsKey("_source")) {
-          val inner = json.getJSONObject("_source")
-          inner.containsKey("message")
-        } else {
-          false
-        }
-      } catch {
-        case ex: Exception => false
-      }
+      val json = JSON.parseObject(str)
+      json.containsKey("message")
     }).map(str => {
       val json = JSON.parseObject(str)
-      json.getJSONObject("_source").getString("message")
+      json.getString("message")
     })
-    esdTrans.writeAsText("/Users/fmx/workfiles/metrics_data/es_process1.data")
+    esdTrans.writeAsText(outputFile)
 
     println(env.getExecutionPlan)
     // execute program
